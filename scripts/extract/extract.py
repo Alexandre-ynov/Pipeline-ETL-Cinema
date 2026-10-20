@@ -20,19 +20,17 @@ else:
     raise RuntimeError("Configurez JETON ou CLE_API dans le fichier .env.")
 
 try:
-    collections=[]
-    for collection_id in range(1, 3): 
-        url = f"https://api.themoviedb.org/3/discover/movie?" 
-        response = requests.get(url, headers=headers, params=params, timeout=30)
-        response.raise_for_status()
-        data_api = response.json()
-        output_dir = Path(__file__).resolve().parents[2] / "data" / "raw"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_file = output_dir / "movies_API.json"
-        output_file.write_text(
-            json.dumps(data_api, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+    url = "https://api.themoviedb.org/3/discover/movie?" 
+    response = requests.get(url, headers=headers, params=params, timeout=30)
+    response.raise_for_status()
+    data_api = response.json()
+    output_dir = Path(__file__).resolve().parents[2] / "data" / "raw"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / "movies_API.json"
+    output_file.write_text(
+        json.dumps(data_api, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     print("Données extraites de l'API avec succès :")
     print(f"Réponse enregistrée dans : {output_file}")
 except requests.exceptions.RequestException as error:
