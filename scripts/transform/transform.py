@@ -231,3 +231,21 @@ print(
 
 print("\n--- TYPES DE DONNÉES ---")
 print(df.dtypes)
+
+
+# --- BOITE A MOUSTACHES : DISTRIBUTION DES NOTES ---
+
+import matplotlib.pyplot as plt
+
+scores = df["score"].dropna()
+
+plt.figure(figsize=(8, 5))
+plt.boxplot(scores)
+
+plt.title("Distribution des notes des films")
+plt.ylabel("Note sur 10")
+plt.xticks([1], ["Films"])
+plt.grid(axis="y", alpha=0.3)
+
+plt.tight_layout()
+plt.show()
