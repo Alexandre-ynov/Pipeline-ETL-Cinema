@@ -3,7 +3,7 @@ from pathlib import Path
 import csv
 import pandas as pd
 
-# 1. Définir les chemins
+# 1. Define paths
 ROOT = Path(__file__).resolve().parents[2]
 INPUT_FILE = ROOT / "data" / "raw" / "movies.csv"
 OUTPUT_FILE = ROOT / "data" / "processed" / "movies_clean.csv"
@@ -14,41 +14,41 @@ COLUMNS = [
     "budget", "gross", "company", "runtime"
 ]
 
-# 2. Vérifier le fichier source
+# 2. Check the source file
 if not INPUT_FILE.exists():
-    raise FileNotFoundError(f"Fichier introuvable : {INPUT_FILE}")
+    raise FileNotFoundError(f"File not found: {INPUT_FILE}")
 
 rows = []
 errors = []
 
-# 3. Lire et corriger le format irrégulier
+# 3. Read and fix irregular formatting
 with open(INPUT_FILE, "r", encoding="utf-8-sig", newline="") as file:
     for line_number, line in enumerate(file, start=1):
         line = line.rstrip("\r\n")
 
         if line_number == 1:
-            continue  # En-tête traité séparément
+            continue  # Header handled separately
 
         if not line.strip():
             continue
 
-        # Certaines lignes sont entièrement entourées de guillemets.
+        # Some lines are entirely wrapped in double quotes.
         if line.startswith('"') and line.endswith('";'):
             line = line[1:-2]
         elif line.startswith('"') and line.endswith('"'):
             line = line[1:-1]
 
-        # Décoder les guillemets doublés du CSV.
+        # Decode doubled CSV quotes.
         line = line.replace('""', '"')
 
         try:
             fields = next(csv.reader([line], strict=True))
         except csv.Error as error:
-            errors.append((line_number, f"Erreur CSV : {error}", line))
+            errors.append((line_number, f"CSV error: {error}", line))
             continue
 
-        # Si des colonnes supplémentaires existent, elles peuvent
-        # provenir de virgules dans le titre. On les regroupe au début.
+        # If extra columns exist, they may come from commas
+        # in the title. Recombine them at the beginning.
         if len(fields) > len(COLUMNS):
             extra = len(fields) - len(COLUMNS)
             fields = [",".join(fields[:extra + 1])] + fields[extra + 1:]
@@ -56,28 +56,28 @@ with open(INPUT_FILE, "r", encoding="utf-8-sig", newline="") as file:
         if len(fields) != len(COLUMNS):
             errors.append((
                 line_number,
-                f"{len(fields)} colonnes au lieu de {len(COLUMNS)}",
+                f"{len(fields)} columns instead of {len(COLUMNS)}",
                 line
             ))
             continue
 
         rows.append(fields)
 
-# 4. Construire le DataFrame
+# 4. Build the DataFrame
 df = pd.DataFrame(rows, columns=COLUMNS)
 
-# Correction ciblée du titre mal formaté dans la source
+# Targeted fix for a malformed title in the source
 mask = df["name"].eq('Code Geass: Lelouch of the Re;"Surrection')
 df.loc[mask, "name"] = "Code Geass: Lelouch of the Re;Surrection"
 
-# 5. Nettoyer les espaces et les valeurs vides
+# 5. Clean whitespace and empty values
 for column in df.columns:
     df[column] = df[column].map(
         lambda value: value.strip() if isinstance(value, str) else value
     )
     df[column] = df[column].replace("", pd.NA)
 
-# 6. Convertir les colonnes numériques
+# 6. Convert numeric columns
 numeric_columns = [
     "year", "score", "votes", "budget", "gross", "runtime"
 ]
@@ -85,35 +85,35 @@ numeric_columns = [
 for column in numeric_columns:
     df[column] = pd.to_numeric(df[column], errors="coerce")
 
-# 7. Vérifier les doublons exacts
+# 7. Check for exact duplicates
 duplicates = df.duplicated().sum()
 df = df.drop_duplicates()
 
-# Nettoyage des colonnes textuelles
+# Clean text columns
 text_columns = df.select_dtypes(include=["object", "str"]).columns
 
 for column in text_columns:
     df[column] = df[column].str.strip()
 
-# Remplacer les chaînes vides par des valeurs manquantes
+# Replace empty strings with missing values
 df.replace(r"^\s*$", pd.NA, regex=True, inplace=True)
 
-# Vérifications après nettoyage
-print("\n--- CONTRÔLE FINAL ---")
-print("Dimensions :", df.shape)
-print("Titres vides :", df["name"].isna().sum())
-print("Doublons exacts :", df.duplicated().sum())
-print("\nValeurs manquantes :")
+# Post-cleaning checks
+print("\n--- FINAL CHECK ---")
+print("Dimensions:", df.shape)
+print("Empty titles:", df["name"].isna().sum())
+print("Exact duplicates:", df.duplicated().sum())
+print("\nMissing values:")
 print(df.isna().sum())
 
 
-# --- GESTION DES VALEURS MANQUANTES ---
+# --- MISSING VALUES HANDLING ---
 
-# Uniformiser les chaînes vides et les espaces seuls
+# Normalize empty strings and whitespace-only values
 df.replace(r"^\s*$", pd.NA, regex=True, inplace=True)
 
-# Afficher le nombre de valeurs manquantes par colonne
-print("\n--- GESTION DES VALEURS MANQUANTES ---")
+# Display the number of missing values per column
+print("\n--- MISSING VALUES HANDLING ---")
 
 missing_values = df.isna().sum()
 
@@ -121,43 +121,43 @@ for column, count in missing_values.items():
     if count > 0:
         percentage = count / len(df) * 100
         print(
-            f"{column} : {count} valeurs manquantes "
-            f"({percentage:.2f} %)"
+            f"{column}: {count} missing values "
+            f"({percentage:.2f}%)"
         )
 
 print(
-    "\nStratégie : les valeurs manquantes sont conservées "
-    "lorsqu'aucune valeur fiable ne permet de les remplacer."
+    "\nStrategy: missing values are kept "
+    "when no reliable replacement value is available."
 )
 
-# 8. Créer le dossier de sortie et exporter
+# 8. Create the output directory and export
 OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8")
 
-# 9. Afficher le bilan
-print("\n--- BILAN DU NETTOYAGE ---")
-print(f"Lignes correctement lues : {len(rows)}")
-print(f"Doublons exacts supprimés : {duplicates}")
-print(f"Lignes mises en anomalie : {len(errors)}")
-print(f"Dimensions finales : {df.shape[0]} lignes, {df.shape[1]} colonnes")
-print(f"Fichier exporté : {OUTPUT_FILE}")
+# 9. Display the cleaning summary
+print("\n--- CLEANING SUMMARY ---")
+print(f"Lines successfully read: {len(rows)}")
+print(f"Exact duplicates removed: {duplicates}")
+print(f"Lines flagged as anomalies: {len(errors)}")
+print(f"Final dimensions: {df.shape[0]} rows, {df.shape[1]} columns")
+print(f"File exported: {OUTPUT_FILE}")
 
 
-print("\n--- CONTRÔLE QUALITÉ ---")
+print("\n--- QUALITY CONTROL ---")
 
-# Afficher quelques films avec leurs principales informations
-print("\nExemples de films :")
+# Display some movies with their main information
+print("\nSample movies:")
 print(
     df[["name", "genre", "year", "score", "budget", "gross"]]
     .head(10)
     .to_string(index=False)
 )
 
-# Vérifier les titres qui semblent suspects
-print("\nTitres vides :")
+# Check for suspicious titles
+print("\nEmpty titles:")
 print(df["name"].isna().sum())
 
-print("\nAnnées hors de l'intervalle 1888-2026 :")
+print("\nYears outside the 1888-2026 range:")
 print(
     df.loc[
         ~df["year"].between(1888, 2026),
@@ -165,8 +165,8 @@ print(
     ].head(20).to_string(index=False)
 )
 
-# Vérifier les notes hors de l'intervalle habituel
-print("\nNotes renseignées hors de l'intervalle 0-10 :")
+# Check for scores outside the usual range
+print("\nScores outside the 0-10 range:")
 
 invalid_scores = df[
     df["score"].notna()
@@ -176,8 +176,8 @@ invalid_scores = df[
 print(invalid_scores[["name", "score"]].to_string(index=False))
 
 
-# Vérifier spécifiquement le film dont le titre posait problème
-print("\nRecherche du film Code Geass :")
+# Check specifically for the movie with the problematic title
+print("\nSearch for Code Geass movie:")
 print(
     df.loc[
         df["name"].str.contains("Code Geass", case=False, na=False),
@@ -186,24 +186,24 @@ print(
 )
 
 
-print("\n--- VALEURS MANQUANTES ---")
+print("\n--- MISSING VALUES ---")
 print(df.isna().sum())
 
 if errors:
-    print("\n--- EXEMPLES D'ANOMALIES ---")
+    print("\n--- ANOMALY EXAMPLES ---")
     for line_number, reason, content in errors[:10]:
-        print(f"Ligne {line_number} : {reason}")
+        print(f"Line {line_number}: {reason}")
         print(content[:200])
 
 
-print("\n--- DOUBLONS POTENTIELS ---")
+print("\n--- POTENTIAL DUPLICATES ---")
 
 duplicate_names = df[
     df["name"].duplicated(keep=False)
 ].sort_values("name")
 
 
-print("\n--- DOUBLONS SUR TITRE, ANNÉE ET RÉALISATEUR ---")
+print("\n--- DUPLICATES ON TITLE, YEAR, AND DIRECTOR ---")
 
 duplicate_movies = df[
     df.duplicated(
@@ -212,7 +212,7 @@ duplicate_movies = df[
     )
 ].sort_values(["name", "year", "director"])
 
-print(f"Lignes concernées : {len(duplicate_movies)}")
+print(f"Rows affected: {len(duplicate_movies)}")
 
 print(
     duplicate_movies[["name", "year", "director"]]
@@ -220,7 +220,7 @@ print(
 )
 
 
-print(f"Films dont le titre apparaît plusieurs fois : {len(duplicate_names)} lignes")
+print(f"Movies with duplicate titles: {len(duplicate_names)} rows")
 
 print(
     duplicate_names[["name", "year", "director"]]
@@ -229,5 +229,5 @@ print(
 )
 
 
-print("\n--- TYPES DE DONNÉES ---")
+print("\n--- DATA TYPES ---")
 print(df.dtypes)

@@ -17,7 +17,7 @@ if token:
 elif api_key:
     params["api_key"] = api_key
 else:
-    raise RuntimeError("Configurez JETON ou CLE_API dans le fichier .env.")
+    raise RuntimeError("Configure JETON or CLE_API in the .env file.")
 
 try:
     url = "https://api.themoviedb.org/3/discover/movie?" 
@@ -31,10 +31,9 @@ try:
         json.dumps(data_api, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    print("Données extraites de l'API avec succès :")
-    print(f"Réponse enregistrée dans : {output_file}")
+    print("Data successfully extracted from the API:")
+    print(f"Response saved to: {output_file}")
 except requests.exceptions.RequestException as error:
-    print(f"Erreur de connexion ou de requête à l'API : {error}")
+    print(f"API connection or request error: {error}")
 except json.JSONDecodeError:
-    print("Erreur : la réponse de l'API n'est pas un JSON valide.")
-
+    print("Error: the API response is not valid JSON.")

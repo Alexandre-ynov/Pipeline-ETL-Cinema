@@ -1,17 +1,16 @@
 import pandas as pd
 
-# Chemin vers le fichier CSV
+# Path to the CSV file
 csv_file_path = 'data/raw/movies.csv'
 
-#On transforme le CSV en DataFrame Pandas
+# Transform the CSV into a Pandas DataFrame
 try:
     df_csv = pd.read_csv(csv_file_path)
-    print("Données extraites du CSV avec succès :")
+    print("Data successfully extracted from CSV:")
     print(df_csv.head())
 except FileNotFoundError:
-    print(f"Erreur: Le fichier '{csv_file_path}' n'a pas été trouvé.")
+    print(f"Error: The file '{csv_file_path}' was not found.")
 except Exception as e:
-    print(f"Une erreur est survenue lors de la lecture du CSV : {e}")
+    print(f"An error occurred while reading the CSV: {e}")
 
-#On corrige les formats dans la DataBase : 
-
+# Fix formats in the database:
