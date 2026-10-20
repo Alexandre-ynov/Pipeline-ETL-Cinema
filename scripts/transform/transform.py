@@ -77,13 +77,25 @@ for column in df.columns:
     )
     df[column] = df[column].replace("", pd.NA)
 
-# 6. Convert numeric columns
+# 6. Convert columns
 numeric_columns = [
     "year", "score", "votes", "budget", "gross", "runtime"
 ]
 
 for column in numeric_columns:
     df[column] = pd.to_numeric(df[column], errors="coerce")
+
+released_values = df['released']
+release_dates = released_values.astype('string').str.extract(
+    r'^([A-Za-z]+ \d{1,2}, \d{4})',
+    expand=False,
+)
+df['released'] = pd.to_datetime(
+    release_dates,
+    format='%B %d, %Y',
+    errors='coerce',
+)
+unparsed_release_dates = released_values.notna() & df['released'].isna()
 
 # 7. Check for exact duplicates
 duplicates = df.duplicated().sum()
