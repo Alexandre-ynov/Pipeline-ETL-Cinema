@@ -30,13 +30,13 @@ Pipeline-ETL-Cinema/
 ├── data/
 │   ├── raw/                          # Raw source data (untouched)
 │   │   ├── movies.csv                # Kaggle dataset (~7,668 movies)
-│   │   └── movies_API.json           # TMDB API response (20 movies)
+│   │   └── movies_API.json           # TMDB API response (10000 movies)
 │   └── processed/                    # Cleaned & transformed data
 │       ├── movies_clean.csv          # Cleaned CSV data
 │       └── movies_API_clean.csv      # Cleaned API data
 ├── database/
 │   ├── database.sql                  # SQL schema definition
-│   └── movies.db                     # SQLite database (7,688 records)
+│   └── movies.db                     # SQLite database créée au chargement
 ├── notebooks/
 │   └── notebook.ipynb                # Exploration & prototyping notebook
 ├── scripts/
@@ -45,7 +45,6 @@ Pipeline-ETL-Cinema/
 │   ├── transform/
 │   │   ├── transform.py              # CSV cleaning & transformation
 │   │   ├── transformJson.py          # JSON (API) transformation
-│   │   └── harmonization.py          # Format harmonization (prototype)
 │   └── load/
 │       └── load.py                   # Database loading script
 ├── requirements/
@@ -62,7 +61,7 @@ Pipeline-ETL-Cinema/
 | Source | Type | Description | Volume |
 |--------|------|-------------|--------|
 | [Kaggle — The Movie Dataset](https://www.kaggle.com/code/ericyooon/the-movie-datasetgit) | CSV file | Comprehensive dataset of movies (1980–2020) with ratings, budget, gross revenue, cast, etc. | ~7,668 movies |
-| [TMDB API](https://developer.themoviedb.org/) | REST API | The Movie Database public API — discover endpoint returning recent/popular movies | 20 movies per request |
+| [TMDB API](https://developer.themoviedb.org/) | REST API | The Movie Database public API — discover endpoint returning recent/popular movies | 10000 movies per request |
 
 ### Why these sources?
 
@@ -124,9 +123,9 @@ The loading phase integrates all cleaned data into a SQLite database:
 - **Data normalization**: All records are re-parsed and normalized (dates, numbers, text) before insertion.
 - **Upsert logic**: Uses `INSERT ... ON CONFLICT DO UPDATE` to handle re-runs without creating duplicates. Each record is uniquely identified by `(source, source_key)`.
 - **Source tracking**: Each row is tagged with its origin (`csv` or `tmdb`) and a source key for traceability.
-- **Loads both** `movies_clean.csv` (7,668 records) and `movies_API_clean.csv` (20 records).
+- **Loads both** `movies_clean.csv` and `movies_API_clean.csv`.
 
-**Output:** `database/movies.db` containing 7,688 records
+**Output:** `database/movies.db`; the record count depends on the source files.
 
 ---
 
@@ -191,7 +190,7 @@ python -m venv .venv
 # source .venv/bin/activate   # macOS/Linux
 
 # Install dependencies
-pip install -r requirements/requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ### Configure API credentials
@@ -252,6 +251,7 @@ sqlite3 database/movies.db "SELECT genre, COUNT(*) as count FROM movies GROUP BY
 requests
 python-dotenv
 pandas
+matplotlib
 ```
 
 ---
