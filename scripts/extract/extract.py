@@ -18,7 +18,7 @@ if token:
 elif api_key:
     params["api_key"] = api_key
 else:
-    raise RuntimeError("Configurez JETON ou CLE_API dans le fichier .env.")
+    raise RuntimeError("Configure JETON or CLE_API in the .env file.")
 
 url = "https://api.themoviedb.org/3/discover/movie"
 max_api_page = 500
