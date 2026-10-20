@@ -50,8 +50,12 @@ TMDB_GENRES = {
 
 
 def clean_value(value):
-    if value is None or value == "":
+    if value is None:
         return "Na"
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value.casefold() in {"na", "n/a", "nan", "null", "none"}:
+            return "Na"
     return value
 
 
@@ -65,6 +69,10 @@ def normalize_release_date(value):
 
 
 def transform_movie(movie):
+    name = clean_value(movie.get("title"))
+    if name == "Na":
+        return None
+
     released = normalize_release_date(movie.get("release_date"))
     year = released[:4] if released != "Na" else "Na"
     genre_ids = movie.get("genre_ids") or []
@@ -76,7 +84,7 @@ def transform_movie(movie):
     transformed = {column: "Na" for column in COLUMNS}
     transformed.update(
         {
-            "name": clean_value(movie.get("title")),
+            "name": name,
             "genre": ", ".join(genres) if genres else "Na",
             "year": year,
             "released": released,
@@ -98,11 +106,12 @@ def main():
     if not isinstance(movies, list):
         raise ValueError("The JSON must contain a list of movies under 'results'.")
 
-    records = [
-        transform_movie(movie)
-        for movie in movies
-        if isinstance(movie, dict) and movie.get("title")
-    ]
+    records = []
+    for movie in movies:
+        if isinstance(movie, dict):
+            record = transform_movie(movie)
+            if record is not None:
+                records.append(record)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_FILE.open("w", encoding="utf-8", newline="") as file:
