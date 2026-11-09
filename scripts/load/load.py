@@ -6,8 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-CSV_FILE = ROOT / "data" / "processed" / "movies_clean.csv"
-API_CLEAN_FILE = ROOT / "data" / "processed" / "movies_API_clean.csv"
+MERGED_FILE = ROOT / "data" / "processed" / "movies_merged.csv"
 SQL_FILE = ROOT / "database" / "database.sql"
 DB_FILE = ROOT / "database" / "movies.db"
 
@@ -87,14 +86,21 @@ def normalize_record(values, source, source_key):
 	return record
 
 
-def load_csv_records(file_path, source):
+def load_merged_records(file_path):
 	if not file_path.exists():
 		raise FileNotFoundError(f"CSV file not found: {file_path}")
 
 	records = []
+	matched_tmdb_keys = []
 	with file_path.open("r", encoding="utf-8-sig", newline="") as file:
 		reader = csv.DictReader(file)
-		if reader.fieldnames != list(MOVIE_COLUMNS):
+		expected_columns = [
+			"source",
+			"source_key",
+			"tmdb_source_key",
+			*MOVIE_COLUMNS,
+		]
+		if reader.fieldnames != expected_columns:
 			raise ValueError(
 				f"Unexpected columns in {file_path.name}: {reader.fieldnames}"
 			)
@@ -103,15 +109,32 @@ def load_csv_records(file_path, source):
 				raise ValueError(
 					f"CSV line {row_number}: extra columns detected."
 				)
+			source = clean_text(row.get("source"))
+			if source not in {"csv", "tmdb"}:
+				raise ValueError(
+					f"CSV line {row_number}: invalid source {source!r}."
+				)
+			source_key = clean_text(row.get("source_key"))
+			if source_key is None:
+				raise ValueError(
+					f"CSV line {row_number}: source_key is required."
+				)
 			name = clean_text(row.get("name"))
 			if name is None:
 				continue
-			source_key = f"row:{row_number}"
+			tmdb_source_key = clean_text(row.get("tmdb_source_key"))
+			if tmdb_source_key is not None:
+				if source != "csv":
+					raise ValueError(
+						f"CSV line {row_number}: only CSV records can contain "
+						"a matched TMDB source key."
+					)
+				matched_tmdb_keys.append(tmdb_source_key)
 			records.append(normalize_record(row, source, source_key))
-	return records
+	return records, matched_tmdb_keys
 
 
-def load_records(records):
+def load_records(records, matched_tmdb_keys):
 	if not SQL_FILE.exists():
 		raise FileNotFoundError(f"SQL schema not found: {SQL_FILE}")
 
@@ -132,15 +155,18 @@ def load_records(records):
 		with connection:
 			connection.executescript(SQL_FILE.read_text(encoding="utf-8"))
 			connection.executemany(
+				"DELETE FROM movies WHERE source = 'tmdb' AND source_key = ?",
+				[(source_key,) for source_key in matched_tmdb_keys],
+			)
+			connection.executemany(
 				query,
 				[tuple(record[column] for column in columns) for record in records],
 			)
 
 
 def main():
-	records = load_csv_records(CSV_FILE, "csv")
-	records += load_csv_records(API_CLEAN_FILE, "tmdb")
-	load_records(records)
+	records, matched_tmdb_keys = load_merged_records(MERGED_FILE)
+	load_records(records, matched_tmdb_keys)
 	print(f"Loading complete: {len(records)} records processed.")
 	print(f"SQLite database: {DB_FILE}")
 

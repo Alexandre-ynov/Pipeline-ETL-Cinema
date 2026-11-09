@@ -15,7 +15,8 @@ We chose to develop an ETL pipeline focused on the movie industry. This pipeline
 - [Pipeline Architecture](#pipeline-architecture)
   - [Step 1 — Extraction](#step-1--extraction)
   - [Step 2 — Transformation](#step-2--transformation)
-  - [Step 3 — Loading](#step-3--loading)
+  - [Step 3 — Fusion](#step-3--fusion)
+  - [Step 4 — Loading](#step-4--loading)
 - [Database Schema](#database-schema)
 - [Installation & Usage](#installation--usage)
 - [Known Issues & Fixes](#known-issues--fixes)
@@ -33,7 +34,8 @@ Pipeline-ETL-Cinema/
 │   │   └── movies_API.json           # TMDB API response (10000 movies)
 │   └── processed/                    # Cleaned & transformed data
 │       ├── movies_clean.csv          # Cleaned CSV data
-│       └── movies_API_clean.csv      # Cleaned API data
+│       ├── movies_API_clean.csv      # Cleaned API data
+│       └── movies_merged.csv         # Combined data, ready to load
 ├── database/
 │   ├── database.sql                  # SQL schema definition
 │   └── movies.db                     # SQLite database créée au chargement
@@ -45,6 +47,7 @@ Pipeline-ETL-Cinema/
 │   ├── transform/
 │   │   ├── transform.py              # CSV cleaning & transformation
 │   │   ├── transformJson.py          # JSON (API) transformation
+│   │   └── merge.py                  # Merge and deduplicate both sources
 │   └── load/
 │       └── load.py                   # Database loading script
 ├── requirements/
@@ -113,7 +116,22 @@ The API data transformation:
 
 **Output:** Cleaned data in `data/processed/`
 
-### Step 3 — Loading
+### Step 3 — Fusion
+
+**Script:** `scripts/transform/merge.py`
+
+The merge step combines `movies_clean.csv` and `movies_API_clean.csv` into
+`movies_merged.csv`. It matches records using a normalized title and release
+year. A match is accepted only when that title/year pair occurs once in each
+source; ambiguous matches are kept as separate records rather than risking a
+false merge.
+
+For matched movies, non-missing values from the CSV take priority, and missing
+CSV fields are filled from TMDB. Movies found in only one source are retained.
+The output also keeps source keys so the load step can trace records and remove
+previously loaded TMDB copies of newly matched movies.
+
+### Step 4 — Loading
 
 **Script:** `scripts/load/load.py`
 
@@ -122,8 +140,8 @@ The loading phase integrates all cleaned data into a SQLite database:
 - **Schema creation**: Executes `database/database.sql` to create the `movies` table with proper types and constraints.
 - **Data normalization**: All records are re-parsed and normalized (dates, numbers, text) before insertion.
 - **Upsert logic**: Uses `INSERT ... ON CONFLICT DO UPDATE` to handle re-runs without creating duplicates. Each record is uniquely identified by `(source, source_key)`.
-- **Source tracking**: Each row is tagged with its origin (`csv` or `tmdb`) and a source key for traceability.
-- **Loads both** `movies_clean.csv` and `movies_API_clean.csv`.
+- **Source tracking**: Rows keep the key of their primary source (`csv` for CSV matches, `tmdb` for API-only movies). The merged file also records the matched TMDB key.
+- **Loads** the merged `movies_merged.csv`.
 
 **Output:** `database/movies.db`; the record count depends on the source files.
 
@@ -218,7 +236,10 @@ python scripts/transform/transform.py
 # 3. Transform the API JSON data
 python scripts/transform/transformJson.py
 
-# 4. Load everything into the SQLite database
+# 4. Merge the transformed files
+python scripts/transform/merge.py
+
+# 5. Load the merged data into the SQLite database
 python scripts/load/load.py
 ```
 
